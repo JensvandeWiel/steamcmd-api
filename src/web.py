@@ -42,9 +42,6 @@ def read_app(app_id: int, pretty: bool = False):
             logging.info(
                 "App info could not be found in cache", extra={"apps": str([app_id])}
             )
-            info = utils.steam.get_apps_info([app_id])
-            data = json.dumps(info)
-            utils.redis.write("app." + str(app_id), data)
         else:
             info = json.loads(info)
             logging.info(
@@ -95,3 +92,47 @@ def read_item(pretty: bool = False):
             "data": "Something went wrong while retrieving and parsing the current API version. Please try again later",
             "pretty": pretty,
         }
+
+
+@app.get("/health")
+def health_check():
+    """
+    Health check endpoint for Kubernetes liveness and readiness probes.
+    """
+    try:
+        # Test Redis connection if cache is enabled
+        if config.cache == "True":
+            rds = utils.redis.connect()
+            if rds is None:
+                return {"status": "unhealthy", "error": "Redis connection failed"}, 503
+
+            # Test Redis with a simple ping
+            rds.ping()
+
+        return {"status": "healthy", "timestamp": "2024-01-01T00:00:00Z"}
+
+    except Exception as e:
+        logging.error(f"Health check failed: {e}")
+        return {"status": "unhealthy", "error": str(e)}, 503
+
+
+@app.get("/ready")
+def readiness_check():
+    """
+    Readiness check endpoint for Kubernetes readiness probes.
+    """
+    try:
+        # Test Redis connection if cache is enabled
+        if config.cache == "True":
+            rds = utils.redis.connect()
+            if rds is None:
+                return {"status": "not_ready", "error": "Redis connection failed"}, 503
+
+            # Test Redis with a simple ping
+            rds.ping()
+
+        return {"status": "ready"}
+
+    except Exception as e:
+        logging.error(f"Readiness check failed: {e}")
+        return {"status": "not_ready", "error": str(e)}, 503
