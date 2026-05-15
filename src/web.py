@@ -42,6 +42,11 @@ def read_app(app_id: int, pretty: bool = False):
             logging.info(
                 "App info could not be found in cache", extra={"apps": str([app_id])}
             )
+            # Fallback to fetching from Steam if not in cache
+            info = utils.steam.get_apps_info([app_id])
+            # Cache the fetched data
+            if info:
+                utils.redis.write("app." + str(app_id), json.dumps(info))
         else:
             info = json.loads(info)
             logging.info(
